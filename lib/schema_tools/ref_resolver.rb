@@ -76,7 +76,6 @@ module SchemaTools
       recursive_search || path
     end
 
-
     def self._retrieve_pointer_from_object(pointer, object)
       # assume path to be the JSONPointer expression:
       #  json/pointer/expression
