@@ -24,10 +24,12 @@ module SchemaTools
         # hash-symbol syntax pointing to a property of a schema. client.json#properties
         raise "invalid json pointer: #{json_pointer}" unless json_pointer =~ /^(.*)#(.*)/
         uri, pointer = json_pointer.match(/^(.*)#(.*)/).captures
+        internal_reference = false
       elsif json_pointer[0] == '#'
         raise "invalid internal json ref: #{json_pointer}" unless stack.include?(json_pointer) && json_pointer.size != 1
         internal_reference = true
       else
+        internal_reference = false
         uri = json_pointer
       end
       raise "invalid uri pointer: #{json_pointer}" if !internal_reference && uri.empty?
@@ -36,7 +38,7 @@ module SchemaTools
         path = json_pointer.split('#')[1]
         ref = path.split('/')
         props = relative_to
-        ref.each { |i| props = props[i]}
+        ref.each { |i| props = props[i] if props.is_a? Hash}
         schema = {ref.last => props}
       else
         uri = URI.parse(uri)
@@ -81,12 +83,10 @@ module SchemaTools
       #  json/pointer/expression
       # and obj to be the ruby hash representation of the json
       path = pointer.is_a?(Array) ? pointer : pointer.split("/")
-
       while object != nil && component = path.shift
         component = component.to_i if object.is_a?(Array) && component =~ /^\d+$/
         object = object[component]
       end
-
       return object
     end
 
