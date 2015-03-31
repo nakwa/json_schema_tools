@@ -26,6 +26,7 @@ module SchemaTools
           self.absolute_filename= name_or_hash
           decode src
       end
+      @include_ref = ["oneOf", "items"]
       handle_extends
       resolve_refs
     end
@@ -125,21 +126,22 @@ module SchemaTools
     # "$ref" param and resolve it. Other params are checked for nested hashes
     # and those are processed.
     # @param [HashWithIndifferentAccess] schema - single schema
-    def resolve_refs schema = nil, stack = []
+    def resolve_refs(schema = nil, stack = [], parent = nil)
       schema ||= @hash
       keys = schema.keys # in case you are wondering: RuntimeError: can't add a new key into hash during iteration
       keys.each do |k|
         v = schema[k]
-        if k == "$ref"
-          resolve_reference schema, stack
+        parent = k if @include_ref.include?(k)
+        if k == '$ref'
+          resolve_reference schema, stack, parent
           #stack.clear # ref resolved, reset stack
         elsif v.is_a?(::Hash) || v.is_a?(ActiveSupport::HashWithIndifferentAccess)
-          resolve_refs v, stack
+          resolve_refs v, stack, parent
         elsif v.is_a?(Array)
           v.each do |element|
             case element
               when ::Hash, ActiveSupport::HashWithIndifferentAccess, ::Array
-                resolve_refs element, stack
+                resolve_refs element, stack, parent
             end
           end
         end
@@ -149,16 +151,17 @@ module SchemaTools
 
     #
     # @param [Hash] hash schema
-    def resolve_reference(hash, stack=[])
-      json_pointer = hash["$ref"]
+    def resolve_reference(hash, stack=[], parent)
+      json_pointer = hash['$ref']
       # we should probably have a "too many levels of $ref exception or something ..."
       stack.push json_pointer
-      values_from_pointer = RefResolver.load_json_pointer(json_pointer, self, stack)
+      values_from_pointer = RefResolver.load_json_pointer(json_pointer, self, stack, parent)
       # recurse to resolve possible refs in object properties
-      resolve_refs(values_from_pointer, stack)
-
+      inc_ref = false
+      inc_ref = true if @include_ref.include?(parent)
+      resolve_refs(values_from_pointer, stack, inc_ref)
       hash.merge!(values_from_pointer) { |key, old, new| old }
-      hash.delete("$ref")
+      hash.delete('$ref')
       stack.pop
     end
 

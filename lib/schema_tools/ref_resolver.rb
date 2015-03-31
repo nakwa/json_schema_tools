@@ -19,7 +19,7 @@ module SchemaTools
     # @param [Schema] relative_to if the pointer refers to a local schema, this is this
     # the hash to evaluate it against. If the pointer contains a uri to a
     # referenced schema, an attempt is made to load
-    def self.load_json_pointer(json_pointer, relative_to = nil, stack)
+    def self.load_json_pointer(json_pointer, relative_to = nil, stack = nil, inc_ref = false)
       if json_pointer[/#/] && json_pointer[0] != '#'
         # hash-symbol syntax pointing to a property of a schema. client.json#properties
         raise "invalid json pointer: #{json_pointer}" unless json_pointer =~ /^(.*)#(.*)/
@@ -49,7 +49,7 @@ module SchemaTools
         open (path) {|f| schema = JSON.parse(f.read) }
       end
       if pointer
-        self._retrieve_pointer_from_object(pointer, schema)
+        self._retrieve_pointer_from_object(pointer, schema, inc_ref)
       else
         schema
       end
@@ -60,7 +60,7 @@ module SchemaTools
     # contact.json, ./contacts/client.json
     # @param [Schema] relative_to If the pointer contains a uri to a referenced
     # schema, an attempt is made to load it from the relatives absolute dir
-    def self.find_local_file_path(base_dir, file_path, relative_to=nil)
+    def self.find_local_file_path(base_dir, file_path, relative_to = nil)
       path = File.join(base_dir, file_path)
       return path if File.exist?(path)
 
@@ -78,16 +78,18 @@ module SchemaTools
       recursive_search || path
     end
 
-    def self._retrieve_pointer_from_object(pointer, object)
+    def self._retrieve_pointer_from_object(pointer, schema, inc_ref = false)
       # assume path to be the JSONPointer expression:
       #  json/pointer/expression
       # and obj to be the ruby hash representation of the json
       path = pointer.is_a?(Array) ? pointer : pointer.split("/")
-      while object != nil && component = path.shift
-        component = component.to_i if object.is_a?(Array) && component =~ /^\d+$/
-        object = object[component]
+      while schema != nil && component = path.shift
+        ref_name = component
+        component = component.to_i if schema.is_a?(Array) && component =~ /^\d+$/
+        schema = schema[component]
       end
-      return object
+      schema = {ref_name => schema} if inc_ref && ref_name
+      return schema
     end
 
   end
